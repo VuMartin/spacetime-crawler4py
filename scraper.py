@@ -1,8 +1,41 @@
 import re
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
-
+word_counts = {}
+longest_page = ("", 0)
+subdomains = {}
+unique_urls = set()
 def scraper(url, resp):
+    global longest_page, subdomains
+
+    actual_url = resp.url
+
+    if resp.status != 200 or not resp.raw_response:
+        return []
+
+    if actual_url in unique_urls:
+        return []
+
+    unique_urls.add(actual_url)
+
+    soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+
+    text = soup.get_text()
+    words = re.findall(r"\w+", text.lower())
+
+    for w in words:
+        word_counts[w] = word_counts.get(w, 0) + 1
+
+    # longest page
+    if len(words) > longest_page[1]:
+        longest_page = (actual_url, len(words))
+
+    # subdomain counting
+    parsed = urlparse(actual_url)
+    hostname = parsed.hostname
+    if hostname:
+        subdomains[hostname] = subdomains.get(hostname, 0) + 1
+
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
@@ -39,6 +72,8 @@ def is_valid(url):
     try:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
+            return False
+        if "?" in url:
             return False
         allowed_domains = [
             "ics.uci.edu",
