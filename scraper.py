@@ -42,8 +42,8 @@ def scraper(url, resp):
         word_counts[w] = word_counts.get(w, 0) + 1
 
     # longest page
-    if len(words) > longest_page[1]:
-        longest_page = (actual_url, len(words))
+    if len(filtered_words) > longest_page[1]:
+        longest_page = (actual_url, len(filtered_words))
 
     # subdomain counting
     hostname = parsed_url.hostname
