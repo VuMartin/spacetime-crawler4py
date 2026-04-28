@@ -29,14 +29,21 @@ def scraper(url, resp):
     actual_url = parsed_url._replace(fragment="").geturl()
 
     if resp.status != 200 or not resp.raw_response or actual_url in unique_urls: return []
+    headers = resp.raw_response.headers
+    content_len = int(headers.get("Content-Length", 0))
+
+    # 10MB
+    if content_len > 10_000_000:
+        return []
 
     unique_urls.add(actual_url)
 
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
     text = soup.get_text()
-    words = re.findall(r"\w+", text.lower())
+    words = re.findall(r"[a-zA-Z]+", text.lower())
     filtered_words = [w for w in words if w not in STOP_WORDS and len(w) > 1]
+
     # count words
     for w in filtered_words:
         word_counts[w] = word_counts.get(w, 0) + 1
@@ -71,9 +78,12 @@ def extract_next_links(url, resp):
     found_links = []
     for link in soup.find_all('a', href=True):
         # join relative URLs with base URL
-        full_url = urljoin(resp.url, link['href'])
+        href = link['href'].strip()
+        full_url = urljoin(resp.url, href)
         # remove anything after fragment
         clean_url = full_url.split('#')[0]
+        if " " in clean_url or clean_url.count("http") > 1 or not clean_url.startswith("http"):
+            continue
         found_links.append(clean_url)
 
     return found_links
@@ -83,6 +93,19 @@ def is_valid(url):
     # Decide whether to crawl this url or not.
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
+    # Block known traps: calendars, archives, and excessive query strings
+    if any(trap in url.lower() for trap in [
+        "calendar",
+        "/events/",
+        "?replytocom",
+        "doku.php"
+    ]):
+        return False
+
+    # Block URLs that are too long
+    if len(url) > 200:
+        return False
+
     try:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
