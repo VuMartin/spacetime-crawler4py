@@ -5,6 +5,7 @@ word_counts = {}
 subdomains = {}
 longest_page = ("", 0)
 unique_urls = set()
+fingerprints = []
 STOP_WORDS = {
     "a","about","above","after","again","against","all","am","an","and","any","are","aren't",
     "as","at","be","because","been","before","being","below","between","both","but","by",
@@ -22,27 +23,49 @@ STOP_WORDS = {
     "who","who's","whom","why","why's","with","won't","would","wouldn't","you","you'd","you'll",
     "you're","you've","your","yours","yourself","yourselves"
 }
+
+def get_chunks(words, k=3):
+    chunks = set()
+    for i in range(len(words) - k + 1):
+        chunk = " ".join(words[i : i + k])
+        chunks.add(hash(chunk))
+    return chunks
+
+def intersection(s1, s2):
+    if not s1 or not s2: return 0
+    return len(s1 & s2) / len(s1 | s2)
+
 def scraper(url, resp):
-    global longest_page, word_counts, subdomains, unique_urls
+    global longest_page, word_counts, subdomains, unique_urls, fingerprints
 
     parsed_url = urlparse(resp.url)
     actual_url = parsed_url._replace(fragment="").geturl()
 
     if resp.status != 200 or not resp.raw_response or actual_url in unique_urls: return []
     headers = resp.raw_response.headers
-    content_len = int(headers.get("Content-Length", 0))
+    try:
+        content_len = int(headers.get("Content-Length", 0))
+    except:
+        content_len = 0
 
     # 10MB
     if content_len > 10_000_000:
         return []
 
     unique_urls.add(actual_url)
-
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
     text = soup.get_text()
     words = re.findall(r"[a-zA-Z]+", text.lower())
     filtered_words = [w for w in words if w not in STOP_WORDS and len(w) > 1]
+
+    chunks = get_chunks(filtered_words)
+
+    for fingerprint in fingerprints:
+        if intersection(chunks, fingerprint) > 0.8:
+            return []
+
+    fingerprints.append(chunks)
 
     # count words
     for w in filtered_words:
@@ -93,12 +116,12 @@ def is_valid(url):
     # Decide whether to crawl this url or not.
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
-    # Block known traps: calendars, archives, and excessive query strings
     if any(trap in url.lower() for trap in [
         "calendar",
         "/events/",
-        "?replytocom",
-        "doku.php"
+        "doku.php",
+        "chemdb.ics.uci.edu",
+        "cdb.ics.uci.edu",
     ]):
         return False
 
