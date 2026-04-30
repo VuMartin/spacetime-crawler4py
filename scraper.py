@@ -6,6 +6,7 @@ subdomains = {}
 longest_page = ("", 0)
 unique_urls = set()
 fingerprints = []
+seen_hashes = set()
 STOP_WORDS = {
     "a","about","above","after","again","against","all","am","an","and","any","are","aren't",
     "as","at","be","because","been","before","being","below","between","both","but","by",
@@ -24,10 +25,10 @@ STOP_WORDS = {
     "you're","you've","your","yours","yourself","yourselves"
 }
 
-def get_chunks(words, k=3):
+def get_chunks(words):
     chunks = set()
-    for i in range(len(words) - k + 1):
-        chunk = " ".join(words[i : i + k])
+    for i in range(len(words) - 3 + 1):
+        chunk = " ".join(words[i : i + 3])
         chunks.add(hash(chunk))
     return chunks
 
@@ -36,7 +37,7 @@ def intersection(s1, s2):
     return len(s1 & s2) / len(s1 | s2)
 
 def scraper(url, resp):
-    global longest_page, word_counts, subdomains, unique_urls, fingerprints
+    global longest_page, word_counts, subdomains, unique_urls, fingerprints, seen_hashes
 
     parsed_url = urlparse(resp.url)
     actual_url = parsed_url._replace(fragment="").geturl()
@@ -56,9 +57,17 @@ def scraper(url, resp):
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
     text = soup.get_text()
-    words = re.findall(r"[a-zA-Z]+", text.lower())
+    words = re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)?", text.lower())
+
     filtered_words = [w for w in words if w not in STOP_WORDS and len(w) > 1]
 
+    if len(filtered_words) < 25:
+        return []
+
+    page_hash = hash(" ".join(filtered_words))
+    if page_hash in seen_hashes:
+        return []
+    seen_hashes.add(page_hash)
     chunks = get_chunks(filtered_words)
 
     for fingerprint in fingerprints:
@@ -119,16 +128,26 @@ def is_valid(url):
     if any(trap in url.lower() for trap in [
         "calendar",
         "/events/",
-        "doku.php",
+        "?do=",
+        "?idx=",
         "chemdb.ics.uci.edu",
         "cdb.ics.uci.edu",
+        "tab_files=",
+        "requesttracker",
+        "?ns=",
+        "?rev=",
+        "tab_details=",
+        "version=",
+        "?action=",
+        "format=",
+        "timeline",
+        "keywords=",
+        "search=",
+        ".ppsx",
+        ".sql",
+        ".db",
     ]):
         return False
-
-    # Block URLs that are too long
-    if len(url) > 200:
-        return False
-
     try:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
