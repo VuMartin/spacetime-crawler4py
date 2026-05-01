@@ -53,7 +53,6 @@ def scraper(url, resp):
     if content_len > 10_000_000:
         return []
 
-    unique_urls.add(actual_url)
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
     text = soup.get_text()
@@ -71,10 +70,11 @@ def scraper(url, resp):
     chunks = get_chunks(filtered_words)
 
     for fingerprint in fingerprints:
-        if intersection(chunks, fingerprint) > 0.8:
+        if intersection(chunks, fingerprint) > 0.85:
             return []
 
     fingerprints.append(chunks)
+    unique_urls.add(actual_url)
 
     # count words
     for w in filtered_words:
@@ -129,25 +129,29 @@ def is_valid(url):
         "calendar",
         "/events/",
         "?do=",
+        "&do=",
         "?idx=",
         "chemdb.ics.uci.edu",
         "cdb.ics.uci.edu",
         "tab_files=",
         "requesttracker",
-        "?ns=",
+        "ticket/display.html?id=",
         "?rev=",
         "tab_details=",
-        "version=",
-        "?action=",
-        "format=",
-        "timeline",
         "keywords=",
         "search=",
+        "version=",
         ".ppsx",
+        "?from=",
+        "?action=",
+        "format=",
+        "&precision",
+        "timeline",
         ".sql",
         ".db",
     ]):
         return False
+
     try:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:

@@ -18,23 +18,24 @@ def main(config_file, restart):
 
     from scraper import word_counts, unique_urls, longest_page, subdomains
 
-    # 1. Unique pages
-    print("Unique pages:", len(unique_urls))
+    with open("report.txt", "w") as f:
+        # 1. Unique pages
+        f.write(f"Unique pages: {len(unique_urls)}\n\n")
 
-    # 2. Longest page
-    print("Longest page:", longest_page)
+        # 2. Longest page
+        f.write(f"Longest page: {longest_page[0]} ({longest_page[1]} words)\n\n")
 
-    # 3. Top 50 words
-    sorted_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:50]
-    print("\nTop 50 words:")
-    for word, freq in sorted_words:
-        print(word, freq)
+        # 3. Top 50 words
+        sorted_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+        f.write("Top 50 words:\n")
+        for word, freq in sorted_words:
+            f.write(f"{word} {freq}\n")
 
-    # 4. Subdomains
-    sorted_subs = sorted(subdomains.items())
-    print("\nSubdomains:")
-    for sub, count in sorted_subs:
-        print(f"{sub}, {count}")
+        # 4. Subdomains
+        sorted_subs = sorted(subdomains.items())
+        f.write("\nSubdomains:\n")
+        for sub, count in sorted_subs:
+            f.write(f"{sub}, {count}\n")
 
 
 if __name__ == "__main__":
