@@ -5,6 +5,7 @@ word_counts = {}
 subdomains = {}
 longest_page = ("", 0)
 unique_urls = set()
+all_urls = set()
 fingerprints = []
 seen_hashes = set()
 STOP_WORDS = {
@@ -37,12 +38,18 @@ def intersection(s1, s2):
     return len(s1 & s2) / len(s1 | s2)
 
 def scraper(url, resp):
-    global longest_page, word_counts, subdomains, unique_urls, fingerprints, seen_hashes
+    global longest_page, word_counts, subdomains, unique_urls, fingerprints, seen_hashes, all_urls
 
     parsed_url = urlparse(resp.url)
     actual_url = parsed_url._replace(fragment="").geturl()
 
-    if resp.status != 200 or not resp.raw_response or actual_url in unique_urls: return []
+    if resp.status != 200 or not resp.raw_response or actual_url in all_urls: return []
+    content_type = resp.raw_response.headers.get("Content-Type", "")
+    if "text/html" not in content_type.lower() and "xhtml+xml" not in content_type.lower():
+        return []
+    final_url = parsed_url._replace(fragment="", query="").geturl()
+    unique_urls.add(final_url)
+    all_urls.add(actual_url)
     headers = resp.raw_response.headers
     try:
         content_len = int(headers.get("Content-Length", 0))
@@ -74,7 +81,6 @@ def scraper(url, resp):
             return []
 
     fingerprints.append(chunks)
-    unique_urls.add(actual_url)
 
     # count words
     for w in filtered_words:
@@ -138,17 +144,10 @@ def is_valid(url):
         "ticket/display.html?id=",
         "?rev=",
         "tab_details=",
-        "keywords=",
-        "search=",
-        "version=",
-        ".ppsx",
-        "?from=",
         "?action=",
-        "format=",
-        "&precision",
-        "timeline",
-        ".sql",
-        ".db",
+        "?version=",
+        "?from=",
+        "timeline"
     ]):
         return False
 
